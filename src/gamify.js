@@ -4,6 +4,12 @@
 // ============================================
 
 const STORAGE_KEY_XP = 'manifesto_user_xp';
+import { getCurrentUID, saveTypingStats } from './store.js';
+
+function getKey() {
+  const uid = getCurrentUID();
+  return uid ? `${STORAGE_KEY_XP}_${uid}` : STORAGE_KEY_XP;
+}
 
 const RANKS = [
   { level: 1, name: 'Novice Typist', xpNeeded: 0, icon: '🌱' },
@@ -18,25 +24,38 @@ const RANKS = [
 
 export function getXP() {
   try {
-    return parseInt(localStorage.getItem(STORAGE_KEY_XP) || '0', 10);
+    return parseInt(localStorage.getItem(getKey()) || '0', 10);
   } catch { return 0; }
 }
+
+let xpSyncTimeout = null;
 
 export function addXP(amount) {
   const current = getXP();
   const next = current + amount;
-  localStorage.setItem(STORAGE_KEY_XP, next.toString());
+  localStorage.setItem(getKey(), next.toString());
 
   // Check level up
   const oldRank = getRankForXP(current);
   const newRank = getRankForXP(next);
 
-  return {
+  const result = {
     xp: next,
     gained: amount,
     leveledUp: newRank.level > oldRank.level,
     newRank,
   };
+
+  // Dispatch global event for live UI updates
+  window.dispatchEvent(new CustomEvent('manifesto-xp-gained', { detail: result }));
+
+  // Sync to cloud (debounced by 3 seconds)
+  clearTimeout(xpSyncTimeout);
+  xpSyncTimeout = setTimeout(() => {
+    saveTypingStats(undefined, next);
+  }, 3000);
+
+  return result;
 }
 
 export function getRankForXP(xp) {

@@ -4,9 +4,11 @@
 // ============================================
 
 import { soundEngine } from './audio.js';
+import { addXP, getXP, getRankForXP } from './gamify.js';
+import { saveTypingStats } from './store.js';
 
 // Word pools by difficulty — common English words
-const WORD_POOLS = {
+export const WORD_POOLS = {
   easy: [
     'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'it',
     'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 'this',
@@ -132,6 +134,7 @@ export class TypingTest {
     this.onLearn = null; // callback to switch to learn mode
 
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleXPGained = this.handleXPGained.bind(this);
   }
 
   /**
@@ -147,6 +150,9 @@ export class TypingTest {
   }
 
   getHTML() {
+    const xp = getXP();
+    const rank = getRankForXP(xp);
+
     return `
       <div class="typing-test" id="typing-test">
         <!-- Top bar -->
@@ -160,6 +166,14 @@ export class TypingTest {
             <span class="tt-brand-text">Typing Practice</span>
           </div>
           <div class="tt-spacer"></div>
+          <div class="tt-xp-badge" id="tt-xp-badge">
+            <span class="tt-xp-icon">${rank.icon}</span>
+            <span class="tt-xp-value">${xp} XP</span>
+          </div>
+          <button class="btn btn-secondary" id="tt-leaderboard-btn">
+            <span>🏆</span>
+            <span>Leaderboard</span>
+          </button>
           <button class="btn btn-secondary" id="tt-learn-btn">
             <span>🎓</span>
             <span>Learn Touch Typing</span>
@@ -175,6 +189,7 @@ export class TypingTest {
               <button class="tt-pill ${this.timeLimit === 30 ? 'active' : ''}" data-time="30">30</button>
               <button class="tt-pill ${this.timeLimit === 60 ? 'active' : ''}" data-time="60">60</button>
               <button class="tt-pill ${this.timeLimit === 120 ? 'active' : ''}" data-time="120">120</button>
+              <button class="tt-pill ${this.timeLimit === Infinity ? 'active' : ''}" data-time="Infinity" title="Free Type (Infinite)">∞</button>
             </div>
           </div>
           <div class="tt-config-divider"></div>
@@ -251,11 +266,17 @@ export class TypingTest {
       if (this.onLearn) this.onLearn();
     });
 
+    // Leaderboard button
+    document.getElementById('tt-leaderboard-btn')?.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('manifesto-open-leaderboard'));
+    });
+
     // Time pills
     this.container.querySelectorAll('[data-time]').forEach((btn) => {
       btn.addEventListener('click', () => {
         if (this.isRunning) return;
-        this.timeLimit = parseInt(btn.dataset.time, 10);
+        const timeVal = btn.dataset.time;
+        this.timeLimit = timeVal === 'Infinity' ? Infinity : parseInt(timeVal, 10);
         this.timeLeft = this.timeLimit;
         this.reset();
       });
@@ -319,7 +340,26 @@ export class TypingTest {
         setTimeout(() => { this._tabPressed = false; }, 500);
       }
     });
+
+    // XP gained listener
+    window.addEventListener('manifesto-xp-gained', this.handleXPGained);
   }
+
+  handleXPGained(e) {
+    const { xp, newRank } = e.detail;
+    const badge = document.getElementById('tt-xp-badge');
+    if (badge) {
+      badge.querySelector('.tt-xp-icon').textContent = newRank.icon;
+      badge.querySelector('.tt-xp-value').textContent = `${xp} XP`;
+      
+      // Pop animation
+      badge.classList.remove('pop');
+      void badge.offsetWidth; // trigger reflow
+      badge.classList.add('pop');
+    }
+  }
+
+
 
   handleKeyDown(e) {
     if (this.isFinished) return;
@@ -383,6 +423,11 @@ export class TypingTest {
     if (this.typed[wi] === this.words[wi]) {
       this.wordStatuses[wi] = 'correct';
       this.correctWords++;
+      
+      // Earn live XP!
+      const wordLength = this.words[wi].length;
+      const xpEarned = Math.ceil(wordLength / 2); // 1 XP per 2 chars roughly
+      addXP(xpEarned);
     } else {
       this.wordStatuses[wi] = 'incorrect';
       this.incorrectWords++;
@@ -391,7 +436,18 @@ export class TypingTest {
     this.currentWordIndex++;
     this.currentCharIndex = 0;
 
-    // If we've typed all words, finish
+    // Infinite mode: append more words if we are close to the end
+    if (this.timeLimit === Infinity && this.words.length - this.currentWordIndex < 20) {
+      const pool = WORD_POOLS[this.difficulty] || WORD_POOLS.medium;
+      for (let i = 0; i < 30; i++) {
+        this.words.push(pool[Math.floor(Math.random() * pool.length)]);
+      }
+      // Expand arrays
+      this.typed.push(...new Array(30).fill(''));
+      this.wordStatuses.push(...new Array(30).fill('pending'));
+    }
+
+    // If we've typed all words (timed mode), finish
     if (this.currentWordIndex >= this.words.length) {
       this.finish();
       return;
@@ -488,16 +544,15 @@ export class TypingTest {
     const currentWordEl = wordsEl?.querySelector('.tt-word.current');
     if (!currentWordEl || !wordsEl) return;
 
-    const wrapperEl = document.getElementById('tt-words-wrapper');
-    if (!wrapperEl) return;
-
-    const wrapperRect = wrapperEl.getBoundingClientRect();
-    const wordRect = currentWordEl.getBoundingClientRect();
-
-    // If the word is below the visible area, scroll
-    if (wordRect.top > wrapperRect.top + wrapperRect.height * 0.6) {
-      const lineHeight = wordRect.height + 12;
-      wordsEl.style.transform = `translateY(-${Math.max(0, wordRect.top - wrapperRect.top - lineHeight)}px)`;
+    // Use offsetTop which is stable and ignores CSS transforms
+    const offset = currentWordEl.offsetTop;
+    
+    // Line height is ~45px. If we are on the 3rd line or below (offset > 45),
+    // we scroll up so the current line becomes the second visible line.
+    if (offset > 45) {
+      wordsEl.style.transform = `translateY(-${offset - 45}px)`;
+    } else {
+      wordsEl.style.transform = `translateY(0px)`;
     }
   }
 
@@ -511,11 +566,11 @@ export class TypingTest {
 
     this.timer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-      this.timeLeft = Math.max(0, this.timeLimit - elapsed);
+      this.timeLeft = this.timeLimit === Infinity ? elapsed : Math.max(0, this.timeLimit - elapsed);
       this.updateTimerDisplay();
       this.updateLiveStats();
 
-      if (this.timeLeft <= 0) {
+      if (this.timeLimit !== Infinity && this.timeLeft <= 0) {
         this.finish();
       }
     }, 100);
@@ -524,11 +579,19 @@ export class TypingTest {
   updateTimerDisplay() {
     const timerEl = document.getElementById('tt-timer');
     if (timerEl) {
-      timerEl.textContent = this.timeLeft;
-      if (this.timeLeft <= 5 && this.isRunning) {
-        timerEl.classList.add('warning');
-      } else {
+      if (this.timeLimit === Infinity) {
+        // Format as MM:SS for infinite mode
+        const mins = Math.floor(this.timeLeft / 60);
+        const secs = this.timeLeft % 60;
+        timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         timerEl.classList.remove('warning');
+      } else {
+        timerEl.textContent = this.timeLeft;
+        if (this.timeLeft <= 5 && this.isRunning) {
+          timerEl.classList.add('warning');
+        } else {
+          timerEl.classList.remove('warning');
+        }
       }
     }
   }
@@ -653,6 +716,14 @@ export class TypingTest {
       if (!existing.wpm || wpm > existing.wpm) {
         localStorage.setItem(key, JSON.stringify({ wpm, accuracy, date: new Date().toISOString() }));
       }
+
+      // Sync global best to cloud
+      const globalKey = `manifesto_typing_global_best`;
+      const globalBest = parseInt(localStorage.getItem(globalKey) || '0', 10);
+      if (wpm > globalBest) {
+        localStorage.setItem(globalKey, wpm.toString());
+        saveTypingStats(wpm, undefined);
+      }
     } catch (e) { /* ignore */ }
   }
 
@@ -689,6 +760,8 @@ export class TypingTest {
     if (this._globalKeyHandler) {
       document.removeEventListener('keydown', this._globalKeyHandler);
     }
+    window.removeEventListener('manifesto-xp-gained', this.handleXPGained);
+    saveTypingStats(undefined, getXP());
     this.container.innerHTML = '';
   }
 }

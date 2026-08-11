@@ -3,7 +3,8 @@
 // Reusable rendering functions
 // ============================================
 
-import { getStats, getWeekStats } from './store.js';
+import { getStats, getWeekStats, getCategoryStats, getStreakDays, getLast7DaysActivity, getFocusStats, loadScratchpad } from './store.js';
+import { getXP, getRankForXP, getNextRank } from './gamify.js';
 
 // SVG Icons
 const ICONS = {
@@ -40,12 +41,87 @@ const STATUS_LABELS = {
   done: 'Done',
 };
 
+const QUOTES = [
+  "Discipline is choosing between what you want now and what you want most.",
+  "Small daily improvements are the key to staggering long-term results.",
+  "The secret of getting ahead is getting started.",
+  "What gets measured gets managed.",
+  "Focus on being productive instead of busy.",
+  "Don't count the days — make the days count.",
+  "Success is the sum of small efforts repeated day in and day out.",
+  "Your future is created by what you do today, not tomorrow.",
+];
+
 function getCategoryEmoji(cat) {
   const found = CATEGORIES.find((c) => c.value === cat);
   return found ? found.emoji : '📌';
 }
 
-// ---- Dashboard ----
+function getTimeGreeting() {
+  const h = new Date().getHours();
+  if (h < 5) return '🌙 Night Owl';
+  if (h < 12) return '☀️ Good Morning';
+  if (h < 17) return '🌤️ Good Afternoon';
+  if (h < 21) return '🌆 Good Evening';
+  return '🌙 Night Owl';
+}
+
+// ---- Hero Banner ----
+export function renderHeroBanner(data) {
+  const stats = getStats(data);
+  const xp = getXP();
+  const rank = getRankForXP(xp);
+  const nextRank = getNextRank(rank.level);
+  const xpProgress = nextRank ? Math.min(100, Math.round(((xp - rank.xpNeeded) / (nextRank.xpNeeded - rank.xpNeeded)) * 100)) : 100;
+  const streak = getStreakDays();
+  const quoteIdx = Math.floor(Date.now() / 86400000) % QUOTES.length;
+
+  return `
+    <div class="hero-top">
+      <div class="hero-greeting">
+        <div class="hero-time-row">
+          <span class="hero-clock" id="hero-clock"></span>
+          <span class="hero-date" id="hero-date"></span>
+        </div>
+        <h2 class="hero-title">${getTimeGreeting()}, Commander</h2>
+      </div>
+      <div class="hero-xp-area">
+        <div class="hero-rank">
+          <span class="hero-rank-icon">${rank.icon}</span>
+          <span class="hero-rank-name">${rank.name}</span>
+          <span class="hero-rank-level">Lv.${rank.level}</span>
+        </div>
+        <div class="hero-xp-bar-wrap">
+          <div class="hero-xp-bar">
+            <div class="hero-xp-fill" style="width: ${xpProgress}%"></div>
+          </div>
+          <span class="hero-xp-text">${xp}${nextRank ? ` / ${nextRank.xpNeeded} XP` : ' XP (MAX)'}</span>
+        </div>
+        ${streak > 0 ? `<div class="hero-streak">🔥 ${streak} day${streak !== 1 ? 's' : ''} streak</div>` : ''}
+      </div>
+    </div>
+    <div class="hero-quote" id="hero-quote">
+      <span class="hero-quote-text">"${QUOTES[quoteIdx]}"</span>
+      <button class="hero-quote-shuffle" id="quote-shuffle-btn" title="New quote">🎲</button>
+    </div>
+    <div class="hero-actions">
+      <button class="hero-action-pill" id="hero-add-goal" title="Add Goal">
+        ${ICONS.plus} <span>Goal</span> <kbd>N</kbd>
+      </button>
+      <button class="hero-action-pill" id="hero-add-week" title="Add Week">
+        📅 <span>Week</span> <kbd>W</kbd>
+      </button>
+      <button class="hero-action-pill" id="hero-focus" title="Focus Timer">
+        ⏱️ <span>Focus</span> <kbd>F</kbd>
+      </button>
+      <button class="hero-action-pill" id="hero-typing" title="Speed Test">
+        ⌨️ <span>Type</span> <kbd>T</kbd>
+      </button>
+    </div>
+  `;
+}
+
+// ---- Dashboard Stats ----
 export function renderDashboard(data) {
   const stats = getStats(data);
   return `
@@ -121,7 +197,7 @@ export function renderWeekNavigator(data) {
 }
 
 // ---- Week Board ----
-export function renderWeekBoard(data) {
+export function renderWeekBoard(data, currentView = 'list') {
   const week = data.weeks[data.currentWeekIndex];
   if (!week) return renderNoWeeksState();
 
@@ -135,8 +211,8 @@ export function renderWeekBoard(data) {
 
   const goalCards = filteredGoals.length
     ? filteredGoals
-        .map((goal, idx) => renderGoalCard(goal, week.id, idx))
-        .join('')
+      .map((goal, idx) => renderGoalCard(goal, week.id, idx))
+      .join('')
     : renderEmptyGoals(filter);
 
   return `
@@ -153,6 +229,10 @@ export function renderWeekBoard(data) {
         <span class="week-board-subtitle">${stats.total} goal${stats.total !== 1 ? 's' : ''} · ${stats.done} done</span>
       </div>
       <div class="week-board-actions">
+        <div class="view-toggle" id="view-toggle">
+          <button class="view-btn ${currentView === 'list' ? 'active' : ''}" data-view="list" title="List View">📄</button>
+          <button class="view-btn ${currentView === 'constellation' ? 'active' : ''}" data-view="constellation" title="Constellation View">🌌</button>
+        </div>
         <button class="btn btn-primary" id="add-goal-btn" data-week-id="${week.id}">
           ${ICONS.plus}
           <span>Add Goal</span>
@@ -160,7 +240,7 @@ export function renderWeekBoard(data) {
       </div>
     </div>
 
-    ${stats.total > 0 ? `
+    ${stats.total > 0 && currentView === 'list' ? `
     <div class="week-progress">
       <div class="week-progress-header">
         <span class="week-progress-label">Week Progress</span>
@@ -172,16 +252,19 @@ export function renderWeekBoard(data) {
     </div>
     ` : ''}
 
+    ${currentView === 'list' ? `
     <div class="filter-bar" id="filter-bar">
       <button class="filter-pill ${filter === 'all' ? 'active' : ''}" data-filter="all">All</button>
       <button class="filter-pill ${filter === 'todo' ? 'active' : ''}" data-filter="todo">To Do</button>
       <button class="filter-pill ${filter === 'in-progress' ? 'active' : ''}" data-filter="in-progress">In Progress</button>
       <button class="filter-pill ${filter === 'done' ? 'active' : ''}" data-filter="done">Done</button>
     </div>
-
     <div class="goals-list" id="goals-list">
       ${goalCards}
     </div>
+    ` : `
+    <div class="constellation-container" id="constellation-container"></div>
+    `}
   `;
 }
 
@@ -191,15 +274,15 @@ function renderGoalCard(goal, weekId, index) {
     goal.status === 'done'
       ? 'completed'
       : goal.status === 'in-progress'
-      ? 'in-progress'
-      : '';
+        ? 'in-progress'
+        : '';
 
   const checkboxIcon =
     goal.status === 'done'
       ? ICONS.check
       : goal.status === 'in-progress'
-      ? ICONS.halfCheck
-      : '';
+        ? ICONS.halfCheck
+        : '';
 
   const isDone = goal.status === 'done';
 
@@ -237,6 +320,142 @@ function renderGoalCard(goal, weekId, index) {
           <button class="goal-action-btn delete" data-action="delete-goal" data-goal-id="${goal.id}" data-week-id="${weekId}" title="Delete" id="delete-${goal.id}">
             ${ICONS.delete}
           </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---- Sidebar Widgets ----
+export function renderSidebarWidgets(data) {
+  const focusStats = getFocusStats();
+  const streak = getStreakDays();
+  const last7 = getLast7DaysActivity();
+  const scratchpad = loadScratchpad();
+  const catStats = getCategoryStats(data);
+
+  const catBars = CATEGORIES.filter(c => c.value !== 'other').map(c => {
+    const stat = catStats[c.value] || { count: 0, percent: 0 };
+    return `
+      <div class="cat-bar-row">
+        <span class="cat-bar-label">${c.emoji} ${c.label}</span>
+        <div class="cat-bar-track">
+          <div class="cat-bar-fill" style="width: ${stat.percent}%"></div>
+        </div>
+        <span class="cat-bar-value">${stat.count}</span>
+      </div>
+    `;
+  }).join('');
+
+  const heatmapDots = last7.map(d => {
+    const level = d.count === 0 ? 0 : d.count <= 1 ? 1 : d.count <= 3 ? 2 : 3;
+    return `<div class="heatmap-cell" title="${d.label}: ${d.count} completions">
+      <div class="heatmap-dot level-${level}"></div>
+      <span class="heatmap-label">${d.label}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <!-- Focus Timer -->
+    <div class="sidebar-widget" id="focus-widget">
+      <div class="widget-header">
+        <span class="widget-title">⏱️ Focus Timer</span>
+        <span class="widget-badge">${focusStats.sessions} sessions</span>
+      </div>
+      <div class="focus-presets" id="focus-presets">
+        <button class="focus-preset active" data-minutes="25">25m</button>
+        <button class="focus-preset" data-minutes="5">5m</button>
+        <button class="focus-preset" data-minutes="15">15m</button>
+      </div>
+      <div class="focus-display" id="focus-display">25:00</div>
+      <div class="focus-controls">
+        <button class="btn btn-primary focus-btn" id="focus-start-btn">▶ Start</button>
+        <button class="btn btn-secondary focus-btn" id="focus-reset-btn">↺ Reset</button>
+        <button class="btn btn-ghost focus-btn" id="deep-space-btn" title="Enter Deep Space (Fullscreen)">🌌</button>
+      </div>
+    </div>
+
+    <!-- Streak & Heatmap -->
+    <div class="sidebar-widget" id="streak-widget">
+      <div class="widget-header">
+        <span class="widget-title">🔥 Habit Velocity</span>
+        ${streak > 0 ? `<span class="widget-badge streak-badge">${streak} day${streak !== 1 ? 's' : ''} 🔥</span>` : ''}
+      </div>
+      <div class="heatmap-row">${heatmapDots}</div>
+    </div>
+
+    <!-- Typing Arcade -->
+    <div class="sidebar-widget sidebar-widget-cta" id="typing-widget">
+      <div class="widget-header">
+        <span class="widget-title">⌨️ Typing Arcade</span>
+      </div>
+      <p class="widget-desc">Test your speed or learn touch typing</p>
+      <div class="typing-widget-actions">
+        <button class="btn btn-primary" id="sidebar-typing-btn">⌨️ Speed Test</button>
+        <button class="btn btn-secondary" id="sidebar-learn-btn">🎓 Learn</button>
+      </div>
+      <button class="btn btn-ghost" id="sidebar-mp-btn" style="width: 100%; margin-top: var(--space-sm); border: 1px dashed var(--accent-cyan); color: var(--accent-cyan);">⚔️ 1v1 Arena</button>
+    </div>
+
+    <!-- Scratchpad -->
+    <div class="sidebar-widget" id="scratchpad-widget">
+      <div class="widget-header">
+        <span class="widget-title">📝 Scratchpad</span>
+      </div>
+      <textarea class="scratchpad-input" id="scratchpad-input" placeholder="Quick notes, ideas, brain dump...">${escapeHtml(scratchpad)}</textarea>
+      <div class="scratchpad-actions">
+        <button class="btn btn-ghost" id="scratchpad-to-goal" title="Convert to Goal">+ To Goal</button>
+        <button class="btn btn-ghost" id="scratchpad-clear" title="Clear">Clear</button>
+      </div>
+    </div>
+
+    <!-- Category Balance -->
+    <div class="sidebar-widget" id="category-widget">
+      <div class="widget-header">
+        <span class="widget-title">📊 Category Balance</span>
+      </div>
+      <div class="cat-bars">${catBars}</div>
+    </div>
+  `;
+}
+
+// ---- Footer ----
+export function renderFooter() {
+  return `
+    <div class="footer-inner">
+      <div class="footer-left">
+        <div class="footer-status">
+          <span class="status-dot"></span>
+          <span>100% Client-Side · LocalStorage Synced · Zero Latency</span>
+        </div>
+        <div class="footer-brand">MANIFESTO v2.0</div>
+      </div>
+      <div class="footer-center">
+        <div class="footer-data-actions">
+          <button class="btn btn-ghost" id="footer-export-btn">💾 Export</button>
+          <button class="btn btn-ghost" id="footer-import-btn">📂 Import</button>
+          <input type="file" id="import-file-input" accept=".json" style="display:none" />
+        </div>
+        <div class="footer-audio">
+          <label class="audio-toggle-label">
+            <input type="checkbox" id="audio-toggle" checked />
+            <span>🔊 Audio</span>
+          </label>
+          <div class="audio-switches" id="audio-switches">
+            <button class="audio-switch active" data-switch="thock">🐼 Thock</button>
+            <button class="audio-switch" data-switch="clicky">⚡ Clicky</button>
+            <button class="audio-switch" data-switch="cyber">🌌 Cyber</button>
+          </div>
+        </div>
+      </div>
+      <div class="footer-right">
+        <div class="footer-hotkeys">
+          <kbd>N</kbd> Goal
+          <kbd>W</kbd> Week
+          <kbd>/</kbd> Search
+          <kbd>F</kbd> Focus
+          <kbd>T</kbd> Type
+          <kbd>Esc</kbd> Close
         </div>
       </div>
     </div>
@@ -307,7 +526,10 @@ export function renderGoalModal(weekId, existingGoal = null) {
     </div>
     <form id="goal-form" data-week-id="${weekId}" data-goal-id="${existingGoal?.id || ''}">
       <div class="form-group">
-        <label class="form-label" for="goal-title-input">Goal Title</label>
+        <div class="form-label-row" style="display: flex; justify-content: space-between; align-items: center;">
+          <label class="form-label" for="goal-title-input">Goal Title</label>
+          ${!isEdit ? `<button type="button" class="btn btn-ghost" id="ai-breakdown-btn" style="padding: 2px 8px; font-size: 0.8rem;" title="AI Auto-Plan">✨ AI Auto-Plan</button>` : ''}
+        </div>
         <input type="text" class="form-input" id="goal-title-input" name="title"
                placeholder="What do you want to achieve?"
                value="${escapeHtml(existingGoal?.title || '')}"
@@ -357,6 +579,29 @@ export function renderConfirmModal(message, confirmLabel = 'Delete', confirmClas
   `;
 }
 
+export function renderSettingsModal(currentApiKey) {
+  return `
+    <div class="modal-header">
+      <h2 class="modal-title">Settings</h2>
+      <button class="modal-close" id="modal-close-btn">${ICONS.close}</button>
+    </div>
+    <form id="settings-form">
+      <div class="form-group">
+        <label class="form-label" for="settings-api-key">Google Gemini API Key (Free)</label>
+        <input type="password" class="form-input" id="settings-api-key" name="apiKey"
+               placeholder="AIzaSy..." value="${escapeHtml(currentApiKey)}" autocomplete="off" />
+        <div class="form-help" style="font-size: 0.75rem; color: var(--text-tertiary); margin-top: 6px;">
+          Used for the AI Auto-Plan feature. Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-cyan);">Google AI Studio</a>. Saved securely on your device.
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="settings-submit-btn">Save Settings</button>
+      </div>
+    </form>
+  `;
+}
+
 // ---- Search Results ----
 export function renderSearchResults(results) {
   if (results.length === 0) {
@@ -401,6 +646,44 @@ export function renderSearchResults(results) {
       </div>
     </div>
     <div class="goals-list">${cards}</div>
+  `;
+}
+
+// ---- Leaderboard ----
+export function renderLeaderboardModal(topWpm, topXp, activeTab = 'wpm') {
+  const isWpm = activeTab === 'wpm';
+  
+  const wpmRows = topWpm.map((u, i) => `
+    <div class="lb-row ${i < 3 ? 'top-' + (i + 1) : ''}">
+      <div class="lb-rank">#${i + 1}</div>
+      <div class="lb-name">${escapeHtml(u.displayName || 'Anonymous')}</div>
+      <div class="lb-score">${u.bestWpm} <span class="lb-label">WPM</span></div>
+    </div>
+  `).join('');
+
+  const xpRows = topXp.map((u, i) => `
+    <div class="lb-row ${i < 3 ? 'top-' + (i + 1) : ''}">
+      <div class="lb-rank">#${i + 1}</div>
+      <div class="lb-name">${escapeHtml(u.displayName || 'Anonymous')}</div>
+      <div class="lb-score">${u.xp} <span class="lb-label">XP</span></div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="modal-header">
+      <h2 class="modal-title">🏆 Global Leaderboard</h2>
+      <button class="modal-close" id="modal-close-btn">${ICONS.close}</button>
+    </div>
+    <div class="lb-tabs">
+      <button class="lb-tab ${isWpm ? 'active' : ''}" data-tab="wpm">⚡ Top Speeds</button>
+      <button class="lb-tab ${!isWpm ? 'active' : ''}" data-tab="xp">👑 Top Ranks</button>
+    </div>
+    <div class="lb-content" id="lb-content-wpm" style="display: ${isWpm ? 'block' : 'none'};">
+      ${topWpm.length > 0 ? wpmRows : '<div class="empty-state">No speed records yet.</div>'}
+    </div>
+    <div class="lb-content" id="lb-content-xp" style="display: ${!isWpm ? 'block' : 'none'};">
+      ${topXp.length > 0 ? xpRows : '<div class="empty-state">No XP records yet.</div>'}
+    </div>
   `;
 }
 

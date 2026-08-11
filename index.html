@@ -7,7 +7,7 @@
   <meta name="description"
     content="Manifesto — Your personal goal command center. Plan by weeks, track progress, and crush your ambitions with style." />
   <meta name="theme-color" content="#0a0e1a" />
-  <title>Manifesto — Goal Planner</title>
+  <title>Manifesto — Goal Command Center</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,7 +17,11 @@
 </head>
 
 <body>
-  <div id="app">
+  <!-- Auth Page (shown when not logged in) -->
+  <div id="auth-page" class="auth-page"></div>
+
+  <!-- Main App (hidden until logged in) -->
+  <div id="app" class="app-hidden">
     <!-- Ambient background effects -->
     <div class="ambient-bg">
       <div class="orb orb-1"></div>
@@ -55,6 +59,21 @@
           </button>
           <input type="text" class="search-input" id="search-input" placeholder="Search goals..." />
         </div>
+        <span class="header-user-email" id="header-user-email"></span>
+        <button class="btn btn-ghost" id="settings-btn" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button class="btn btn-ghost" id="logout-btn" title="Logout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Logout</span>
+        </button>
         <button class="btn btn-primary" id="add-week-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M12 5v14M5 12h14" />
@@ -64,17 +83,57 @@
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="app-main" id="app-main">
-      <!-- Dashboard -->
-      <section class="dashboard" id="dashboard"></section>
+    <!-- Hero Banner -->
+    <section class="hero-banner" id="hero-banner"></section>
 
-      <!-- Week Navigator -->
-      <section class="week-navigator" id="week-navigator"></section>
+    <!-- Command Layout: 2-column grid -->
+    <div class="command-layout" id="command-layout">
+      <main class="command-main-col" id="app-main">
+        <!-- Dashboard Stats -->
+        <section class="dashboard" id="dashboard"></section>
 
-      <!-- Week Board -->
-      <section class="week-board" id="week-board"></section>
-    </main>
+        <!-- Week Navigator -->
+        <section class="week-navigator" id="week-navigator"></section>
+
+        <!-- Week Board -->
+        <section class="week-board" id="week-board"></section>
+      </main>
+
+      <!-- Sidebar -->
+      <aside class="command-sidebar" id="sidebar"></aside>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer" id="app-footer"></footer>
+
+    <!-- Deep Space Overlay (Phase 1) -->
+    <div class="deep-space-overlay" id="deep-space-overlay">
+      <div class="stars"></div>
+      <div class="twinkling"></div>
+      <div class="deep-space-content">
+        <h2 class="deep-space-title" id="deep-space-title">Focusing...</h2>
+        <div class="deep-space-timer" id="deep-space-timer">25:00</div>
+        <button class="btn btn-ghost deep-space-exit" id="deep-space-exit">Exit Deep Space (Esc)</button>
+      </div>
+    </div>
+
+    <!-- Omnibar Overlay (Phase 2) -->
+    <div class="omnibar-overlay" id="omnibar-overlay">
+      <div class="omnibar">
+        <div class="omnibar-input-row">
+          <span class="omnibar-icon">⚡</span>
+          <input type="text" class="omnibar-input" id="omnibar-input" placeholder="Type a command... (e.g., focus 25, add goal)" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="omnibar-results" id="omnibar-results">
+          <!-- Results populated dynamically -->
+        </div>
+        <div class="omnibar-footer">
+          <span><kbd>↑</kbd><kbd>↓</kbd> to navigate</span>
+          <span><kbd>Enter</kbd> to select</span>
+          <span><kbd>Esc</kbd> to close</span>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal Overlay -->
     <div class="modal-overlay" id="modal-overlay">

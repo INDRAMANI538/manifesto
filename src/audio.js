@@ -163,6 +163,55 @@ class SoundEngine {
     osc.start(now);
     osc.stop(now + 0.1);
   }
+
+  // ---- 🔔 Chime Sound (Focus Timer completion) ----
+  playChimeSound() {
+    this.init();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    // Bell-like harmonics
+    const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      const delay = i * 0.12;
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(this.volume * 0.35, now + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.8);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.8);
+    });
+  }
+
+  // ---- 🎉 Success Sound (Goal completion) ----
+  playSuccessSound() {
+    this.init();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+    gain.gain.setValueAtTime(this.volume * 0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
 }
 
 export const soundEngine = new SoundEngine();
+
+// Convenience exports
+export function playChimeSound() { soundEngine.playChimeSound(); }
+export function playSuccessSound() { soundEngine.playSuccessSound(); }
