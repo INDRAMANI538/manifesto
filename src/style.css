@@ -2285,6 +2285,28 @@ body {
   flex-shrink: 0;
 }
 
+.lt-module-reset {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-tertiary);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-right: var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lt-module-reset:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
 /* AI Guide */
 .lt-ai-guide {
   display: flex;

@@ -365,6 +365,10 @@ export class LearnTyping {
                 : '<span class="lt-module-review">Full Review</span>'}
             </div>
           </div>
+          ${isCompleted ? `<button class="lt-module-reset" data-reset-id="${mod.id}" title="Reset Module">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Reset
+          </button>` : ''}
           <div class="lt-module-status">${statusIcon}</div>
         </div>
       `;
@@ -424,6 +428,18 @@ export class LearnTyping {
         if (this.currentModule) {
           this.currentView = 'lesson';
           this.initLesson();
+          this.render();
+        }
+      });
+    });
+
+    this.container.querySelectorAll('.lt-module-reset').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const moduleId = parseInt(btn.dataset.resetId, 10);
+        if (this.progress[moduleId]) {
+          this.progress[moduleId].completed = false;
+          saveProgress(this.progress);
           this.render();
         }
       });
