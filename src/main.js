@@ -57,6 +57,7 @@ import { renderAuthPage } from './auth-page.js';
 import { TypingTest } from './typing.js';
 import { LearnTyping } from './learn.js';
 import { TypeToPay } from './typetopay.js';
+import { AdminDashboard, isAdmin } from './admin.js';
 import { generateGoalBreakdown } from './ai.js';
 import { ConstellationGraph } from './constellation.js';
 
@@ -68,6 +69,7 @@ let typingMode = false;
 let typingTest = null;
 let learnEngine = null;
 let typeToPay = null;
+let adminDashboard = null;
 let dragState = { dragging: null, fromIndex: null };
 let authMode = 'login';
 let authError = '';
@@ -885,6 +887,11 @@ function setupEventDelegation() {
       enterTypeToPayMode();
       return;
     }
+
+    if (target.closest('#sidebar-admin-btn')) {
+      enterAdminMode();
+      return;
+    }
   });
 
   // Form submissions
@@ -1234,6 +1241,48 @@ function exitTypeToPayMode() {
   if (typeToPay) { typeToPay.destroy(); typeToPay = null; }
   const ttpContainer = document.getElementById('ttp-main-container');
   if (ttpContainer) ttpContainer.style.display = 'none';
+  const heroBanner = $heroBanner();
+  const commandLayout = document.getElementById('command-layout');
+  const footer = $footer();
+  if (heroBanner) heroBanner.style.display = '';
+  if (commandLayout) commandLayout.style.display = '';
+  if (footer) footer.style.display = '';
+  renderAll();
+}
+
+// ---- Admin Mode ----
+function enterAdminMode() {
+  if (!currentUser || !isAdmin(currentUser)) {
+    showToast('Access denied', 'error');
+    return;
+  }
+  
+  const heroBanner = $heroBanner();
+  const commandLayout = document.getElementById('command-layout');
+  const footer = $footer();
+  if (heroBanner) heroBanner.style.display = 'none';
+  if (commandLayout) commandLayout.style.display = 'none';
+  if (footer) footer.style.display = 'none';
+  
+  const app = document.getElementById('app');
+  let adminContainer = document.getElementById('admin-main-container');
+  if (!adminContainer) {
+    adminContainer = document.createElement('section');
+    adminContainer.id = 'admin-main-container';
+    app.appendChild(adminContainer);
+  }
+  adminContainer.style.display = 'block';
+  
+  adminDashboard = new AdminDashboard(adminContainer);
+  adminDashboard.onExit = exitAdminMode;
+  adminDashboard.init();
+}
+
+function exitAdminMode() {
+  if (adminDashboard) { adminDashboard.destroy(); adminDashboard = null; }
+  const adminContainer = document.getElementById('admin-main-container');
+  if (adminContainer) adminContainer.style.display = 'none';
+  
   const heroBanner = $heroBanner();
   const commandLayout = document.getElementById('command-layout');
   const footer = $footer();

@@ -15,8 +15,15 @@ import {
   getUserCashouts,
 } from './store.js';
 
-const WORDS_PER_RUPEE = 150;
-const RATE_PER_WORD = 1 / WORDS_PER_RUPEE; // ≈ ₹0.00667
+const WORDS_PER_RUPEE = {
+  easy: 300,
+  medium: 150,
+  hard: 100
+};
+
+function getRatePerWord(difficulty) {
+  return 1 / (WORDS_PER_RUPEE[difficulty] || 150);
+}
 
 export class TypeToPay {
   constructor(container) {
@@ -65,6 +72,9 @@ export class TypeToPay {
       this.lifetimeWords = local.totalWords;
       this.lifetimeEarnings = local.totalEarnings;
     }
+    
+    // Load cashouts to calculate available balance for main screen
+    this.cashouts = await getUserCashouts();
 
     this.render();
   }
@@ -80,6 +90,11 @@ export class TypeToPay {
   renderTypingView() {
     const xp = getXP();
     const rank = getRankForXP(xp);
+
+    const totalCashedOut = this.cashouts
+      .filter(c => c.status !== 'rejected')
+      .reduce((sum, c) => sum + (c.amount || 0), 0);
+    const availableBalance = Math.max(0, this.lifetimeEarnings - totalCashedOut);
 
     this.container.innerHTML = `
       <div class="ttp-container" id="ttp-container">
@@ -117,13 +132,13 @@ export class TypeToPay {
           </div>
           <div class="ttp-earnings-divider"></div>
           <div class="ttp-earnings-item">
-            <span class="ttp-earnings-label">Lifetime Earnings</span>
-            <span class="ttp-earnings-value ttp-rupee-lifetime" id="ttp-lifetime-earnings">₹${this.lifetimeEarnings.toFixed(2)}</span>
+            <span class="ttp-earnings-label">Total Earnings</span>
+            <span class="ttp-earnings-value ttp-rupee-lifetime" id="ttp-lifetime-earnings">₹${availableBalance.toFixed(2)}</span>
           </div>
           <div class="ttp-earnings-divider"></div>
           <div class="ttp-earnings-item">
             <span class="ttp-earnings-label">Rate</span>
-            <span class="ttp-earnings-value ttp-rate">₹1 / ${WORDS_PER_RUPEE} words</span>
+            <span class="ttp-earnings-value ttp-rate" id="ttp-rate-display">₹1 / ${WORDS_PER_RUPEE[this.difficulty] || 150} words</span>
           </div>
         </div>
 
@@ -279,12 +294,12 @@ export class TypeToPay {
         <div class="ttp-cashout-section">
           <div class="ttp-cashout-header">
             <h3>💸 Cash Out</h3>
-            <button class="btn btn-primary ttp-cashout-btn" id="ttp-cashout-btn" ${netBalance < 10 ? 'disabled' : ''}>
+            <button class="btn btn-primary ttp-cashout-btn" id="ttp-cashout-btn" ${netBalance < 1 ? 'disabled' : ''}>
               Request Cashout
             </button>
           </div>
-          ${netBalance < 10
-            ? `<div class="ttp-cashout-notice">⚠️ Minimum cashout amount is ₹10. Keep typing to earn more!</div>`
+          ${netBalance < 1
+            ? `<div class="ttp-cashout-notice">⚠️ Minimum cashout amount is ₹1. Keep typing to earn more!</div>`
             : ''
           }
         </div>
@@ -327,7 +342,7 @@ export class TypeToPay {
             <div class="ttp-cashout-form">
               <label>
                 <span>Amount (₹)</span>
-                <input type="number" id="ttp-cashout-amount" min="10" max="${Math.floor(netBalance)}" value="${Math.min(Math.floor(netBalance), Math.floor(netBalance))}" step="1" />
+                <input type="number" id="ttp-cashout-amount" min="1" max="${Math.floor(netBalance)}" value="${Math.min(Math.floor(netBalance), Math.floor(netBalance))}" step="1" />
               </label>
               <label>
                 <span>UPI ID</span>
@@ -377,9 +392,9 @@ export class TypeToPay {
         }
         return;
       }
-      if (amount < 10) {
+      if (amount < 1) {
         if (errorEl) {
-          errorEl.textContent = 'Minimum cashout amount is ₹10';
+          errorEl.textContent = 'Minimum cashout amount is ₹1';
           errorEl.style.display = 'block';
         }
         return;
@@ -493,6 +508,13 @@ export class TypeToPay {
       btn.addEventListener('click', () => {
         if (this.isRunning) return;
         this.difficulty = btn.dataset.diff;
+        
+        // Update rate display in UI dynamically
+        const rateEl = document.getElementById('ttp-rate-display');
+        if (rateEl) {
+          rateEl.textContent = `₹1 / ${WORDS_PER_RUPEE[this.difficulty] || 150} words`;
+        }
+        
         this.resetSession();
       });
     });
@@ -609,7 +631,8 @@ export class TypeToPay {
       this.correctWords++;
       this.sessionWords++;
 
-      this.sessionEarnings = this.sessionWords * RATE_PER_WORD;
+      const rate = getRatePerWord(this.difficulty);
+      this.sessionEarnings += rate;
       this.updateEarningsDisplay();
 
       const wordLength = this.words[wi].length;
@@ -723,7 +746,11 @@ export class TypeToPay {
       setTimeout(() => sessionEarnEl.classList.remove('ttp-pulse'), 300);
     }
     if (lifetimeEarnEl) {
-      const total = this.lifetimeEarnings + this.sessionEarnings;
+      const totalCashedOut = this.cashouts
+        .filter(c => c.status !== 'rejected')
+        .reduce((sum, c) => sum + (c.amount || 0), 0);
+      const availableBalance = Math.max(0, this.lifetimeEarnings - totalCashedOut);
+      const total = availableBalance + this.sessionEarnings;
       lifetimeEarnEl.textContent = `₹${total.toFixed(2)}`;
     }
     if (liveEarnEl) {

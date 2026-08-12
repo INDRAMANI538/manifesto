@@ -701,13 +701,61 @@ export async function getUserCashouts() {
     const q = query(
       collection(db, 'cashouts'),
       where('uid', '==', currentUID),
-      orderBy('requestedAt', 'desc'),
-      limit(20)
+      limit(50)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const cashouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    // Sort in memory to avoid requiring a composite index in Firestore
+    cashouts.sort((a, b) => {
+      const timeA = a.requestedAt?.toMillis ? a.requestedAt.toMillis() : 0;
+      const timeB = b.requestedAt?.toMillis ? b.requestedAt.toMillis() : 0;
+      return timeB - timeA;
+    });
+    
+    return cashouts;
   } catch (e) {
     console.warn('Failed to load cashouts:', e);
     return [];
+  }
+}
+
+// ============================================
+// ADMIN FUNCTIONS
+// ============================================
+
+export async function getAllUsers() {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('Failed to get all users:', e);
+    return [];
+  }
+}
+
+export async function getAllCashouts() {
+  try {
+    const q = query(collection(db, 'cashouts'), orderBy('requestedAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('Failed to get all cashouts:', e);
+    return [];
+  }
+}
+
+export async function updateCashoutStatus(docId, status) {
+  try {
+    const docRef = doc(db, 'cashouts', docId);
+    const updateData = { status };
+    if (status === 'done') {
+      updateData.doneAt = serverTimestamp();
+    }
+    await updateDoc(docRef, updateData);
+    return true;
+  } catch (e) {
+    console.error('Failed to update cashout status:', e);
+    return false;
   }
 }

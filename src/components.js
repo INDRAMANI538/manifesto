@@ -5,6 +5,8 @@
 
 import { getStats, getWeekStats, getCategoryStats, getStreakDays, getLast7DaysActivity, getFocusStats, loadScratchpad } from './store.js';
 import { getXP, getRankForXP, getNextRank } from './gamify.js';
+import { auth } from './firebase.js';
+import { isAdmin } from './admin.js';
 
 // SVG Icons
 const ICONS = {
@@ -396,6 +398,10 @@ export function renderSidebarWidgets(data) {
       </div>
       <button class="btn btn-ghost" id="sidebar-mp-btn" style="width: 100%; margin-top: var(--space-sm); border: 1px dashed var(--accent-cyan); color: var(--accent-cyan);">⚔️ 1v1 Arena</button>
       <button class="btn btn-ghost" id="sidebar-ttp-btn" style="width: 100%; margin-top: var(--space-sm); border: 1px dashed #4ade80; color: #4ade80; font-weight: 700;">💰 Type to Pay</button>
+      ${isAdmin(auth.currentUser) ? `
+      <div style="margin-top: var(--space-md); padding-top: var(--space-sm); border-top: 1px solid rgba(255,255,255,0.1);">
+        <button class="btn btn-ghost" id="sidebar-admin-btn" style="width: 100%; color: #fbbf24; font-weight: 700;">👑 Admin Panel</button>
+      </div>` : ''}
     </div>
 
     <!-- Scratchpad -->

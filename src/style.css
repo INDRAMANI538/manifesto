@@ -4238,6 +4238,7 @@ body.deep-space-active .deep-space-overlay {
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.45);
   font-weight: 500;
+  text-align: center;
 }
 
 .ttp-earnings-value {
@@ -4245,6 +4246,7 @@ body.deep-space-active .deep-space-overlay {
   font-weight: 700;
   color: rgba(255, 255, 255, 0.9);
   font-family: 'JetBrains Mono', monospace;
+  text-align: center;
 }
 
 .ttp-rupee {
@@ -4388,8 +4390,9 @@ body.deep-space-active .deep-space-overlay {
 .ttp-cashout-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 16px;
 }
 
 .ttp-cashout-header h3 {
@@ -4662,4 +4665,154 @@ body.deep-space-active .deep-space-overlay {
   .ttp-status-pipeline {
     flex-wrap: wrap;
   }
+}
+
+/* ============================================
+   ADMIN DASHBOARD — Styles
+   ============================================ */
+
+.admin-container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 80px);
+  padding: var(--space-lg) 0;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  animation: fadeIn 0.4s ease;
+}
+
+.admin-dashboard-content {
+  width: 100%;
+  margin-top: var(--space-lg);
+}
+
+.admin-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: var(--space-sm);
+}
+
+.admin-tab {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.admin-tab.active {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.admin-view-area {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 24px;
+  min-height: 400px;
+}
+
+.admin-loading,
+.admin-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.admin-table-wrapper {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.admin-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-table td {
+  padding: 16px 16px;
+  color: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-email {
+  font-weight: 600;
+  color: #fff;
+}
+
+.admin-uid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.admin-amount {
+  font-family: 'JetBrains Mono', monospace;
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.admin-upi {
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.admin-status-select {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-status-select:focus {
+  border-color: #fbbf24;
+}
+
+.admin-status-select option {
+  background: #101423;
+  color: #fff;
 }
