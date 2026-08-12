@@ -56,6 +56,7 @@ import { signUp, logIn, logOut, onAuthChange, getAuthErrorMessage } from './auth
 import { renderAuthPage } from './auth-page.js';
 import { TypingTest } from './typing.js';
 import { LearnTyping } from './learn.js';
+import { TypeToPay } from './typetopay.js';
 import { generateGoalBreakdown } from './ai.js';
 import { ConstellationGraph } from './constellation.js';
 
@@ -66,6 +67,7 @@ let searchMode = false;
 let typingMode = false;
 let typingTest = null;
 let learnEngine = null;
+let typeToPay = null;
 let dragState = { dragging: null, fromIndex: null };
 let authMode = 'login';
 let authError = '';
@@ -878,6 +880,11 @@ function setupEventDelegation() {
       enterMultiplayerMode();
       return;
     }
+
+    if (target.closest('#sidebar-ttp-btn')) {
+      enterTypeToPayMode();
+      return;
+    }
   });
 
   // Form submissions
@@ -1186,6 +1193,47 @@ function exitMultiplayerMode() {
   const mpContainer = document.getElementById('mp-container');
   if (mpContainer) mpContainer.style.display = 'none';
   
+  const heroBanner = $heroBanner();
+  const commandLayout = document.getElementById('command-layout');
+  const footer = $footer();
+  if (heroBanner) heroBanner.style.display = '';
+  if (commandLayout) commandLayout.style.display = '';
+  if (footer) footer.style.display = '';
+  renderAll();
+}
+// ---- Type to Pay Mode ----
+function enterTypeToPayMode() {
+  if (!currentUser) {
+    showToast('You must be logged in to use Type to Pay', 'error');
+    return;
+  }
+  if (typingTest) { typingTest.destroy(); typingTest = null; }
+  if (learnEngine) { learnEngine.destroy(); learnEngine = null; }
+  typingMode = true;
+  const heroBanner = $heroBanner();
+  const commandLayout = document.getElementById('command-layout');
+  const footer = $footer();
+  if (heroBanner) heroBanner.style.display = 'none';
+  if (commandLayout) commandLayout.style.display = 'none';
+  if (footer) footer.style.display = 'none';
+  const app = document.getElementById('app');
+  let ttpContainer = document.getElementById('ttp-main-container');
+  if (!ttpContainer) {
+    ttpContainer = document.createElement('section');
+    ttpContainer.id = 'ttp-main-container';
+    app.appendChild(ttpContainer);
+  }
+  ttpContainer.style.display = 'block';
+  typeToPay = new TypeToPay(ttpContainer);
+  typeToPay.onExit = exitTypeToPayMode;
+  typeToPay.init();
+}
+
+function exitTypeToPayMode() {
+  typingMode = false;
+  if (typeToPay) { typeToPay.destroy(); typeToPay = null; }
+  const ttpContainer = document.getElementById('ttp-main-container');
+  if (ttpContainer) ttpContainer.style.display = 'none';
   const heroBanner = $heroBanner();
   const commandLayout = document.getElementById('command-layout');
   const footer = $footer();

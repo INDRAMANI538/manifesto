@@ -621,3 +621,93 @@ export function listenToMatch(matchId, callback) {
     }
   });
 }
+
+// ============================================
+// TYPE TO PAY — Earnings System
+// ============================================
+
+const EARNINGS_LOCAL_KEY = 'manifesto_earnings';
+
+function getEarningsKey() {
+  return currentUID ? `${EARNINGS_LOCAL_KEY}_${currentUID}` : EARNINGS_LOCAL_KEY;
+}
+
+export function loadEarningsLocal() {
+  try {
+    const raw = localStorage.getItem(getEarningsKey());
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  return { totalWords: 0, totalEarnings: 0 };
+}
+
+export function saveEarningsLocal(totalWords, totalEarnings) {
+  try {
+    localStorage.setItem(getEarningsKey(), JSON.stringify({ totalWords, totalEarnings }));
+  } catch (e) { /* ignore */ }
+}
+
+export async function saveEarningsToCloud(totalWords, totalEarnings) {
+  const ref = getUserDocRef();
+  if (!ref) return;
+  try {
+    await setDoc(ref, {
+      earnings: {
+        totalWords,
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        lastUpdated: new Date().toISOString()
+      }
+    }, { merge: true });
+  } catch (e) {
+    console.warn('Failed to save earnings to cloud:', e);
+  }
+}
+
+export async function loadEarningsFromCloud() {
+  const ref = getUserDocRef();
+  if (!ref) return null;
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists() && snap.data().earnings) {
+      return snap.data().earnings;
+    }
+  } catch (e) {
+    console.warn('Failed to load earnings from cloud:', e);
+  }
+  return null;
+}
+
+export async function requestCashout(amount, upiId) {
+  if (!auth.currentUser) throw new Error('Not logged in');
+  const email = auth.currentUser.email || '';
+  const displayName = email.split('@')[0] || 'Anonymous';
+
+  const cashoutData = {
+    uid: currentUID,
+    displayName,
+    email,
+    amount: Math.round(amount * 100) / 100,
+    upiId,
+    status: 'pending', // pending -> processing -> approved -> done
+    requestedAt: serverTimestamp()
+  };
+
+  const docRef = await addDoc(collection(db, 'cashouts'), cashoutData);
+  return docRef.id;
+}
+
+export async function getUserCashouts() {
+  if (!currentUID) return [];
+  try {
+    const q = query(
+      collection(db, 'cashouts'),
+      where('uid', '==', currentUID),
+      orderBy('requestedAt', 'desc'),
+      limit(20)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('Failed to load cashouts:', e);
+    return [];
+  }
+}

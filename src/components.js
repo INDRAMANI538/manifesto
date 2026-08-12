@@ -395,6 +395,7 @@ export function renderSidebarWidgets(data) {
         <button class="btn btn-secondary" id="sidebar-learn-btn">🎓 Learn</button>
       </div>
       <button class="btn btn-ghost" id="sidebar-mp-btn" style="width: 100%; margin-top: var(--space-sm); border: 1px dashed var(--accent-cyan); color: var(--accent-cyan);">⚔️ 1v1 Arena</button>
+      <button class="btn btn-ghost" id="sidebar-ttp-btn" style="width: 100%; margin-top: var(--space-sm); border: 1px dashed #4ade80; color: #4ade80; font-weight: 700;">💰 Type to Pay</button>
     </div>
 
     <!-- Scratchpad -->
